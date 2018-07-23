@@ -48,13 +48,14 @@ def download(name, url):
 
 def add_scan():
     with open("./target.txt") as f:
-        for i in f:
+        for c, i in enumerate(f):
             url = i.strip()
             if url:
                 try:
+                    print 'add %3d: %s' % (c, url)
                     start_target(url)
                 except:
-                    print 'err:', url
+                    print 'err %3d: %s' % (c, url)
 
 def export(ids):
     data = {"export_id": "21111111-1111-1111-1111-111111111111", "source": {"list_type": "scan_result", "id_list": [ids]}}
