@@ -98,7 +98,7 @@ if len(sys.argv) > 1:
         add_scan()
     elif sys.argv[1] == 'delete':
         for c, (i, j) in enumerate(get_target()):
-            # delete(j)
+            delete(j)
             print 'dele %3d: %s' % (c, i)
     elif sys.argv[1] == 'stop':
         for c, (i, j, o) in enumerate(get_scan()):
