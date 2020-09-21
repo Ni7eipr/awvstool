@@ -14,7 +14,7 @@ from optparse import OptionParser
 from xml.etree.ElementTree import fromstring
 
 import requests
-import urlparse
+from urllib.parse import urlparse
 
 import iso8601
 from conf import *
@@ -25,37 +25,53 @@ headers = {"X-Auth":apikey, "content-type": "application/json"}
 requests.packages.urllib3.disable_warnings()
 req = requests.Session()
 
+# def get_scan():
+#     next_cursor = 0
+#     res = []
+#     response = requests.get(server_url + "/api/v1/scans?l=20", headers=headers, verify=False)
+#     results = response.json()
+#     print(results)
+#     # while next_cursor != None:
+#     #     try:
+#     #         response = requests.get(server_url + "/api/v1/scans?c=" + str(next_cursor), headers=headers, verify=False)
+#     #         results = response.json()
+#     #         sys.stdout.write('page: ' + str(next_cursor / 100) + "x100\r")
+#     #         sys.stdout.flush()
+#     #         next_cursor = results['pagination']['next_cursor']
+#     #         for result in results['scans']:
+#     #             res.append(result)
+#     #     except requests.exceptions.ConnectionError:
+#     #         print("retry:", next_cursor)
+#     print
+#     return res
+
 def get_scan():
-    next_cursor = 0
+    count = 0
+    limit = 100
     res = []
-    while next_cursor != None:
-        try:
-            response = requests.get(server_url + "/api/v1/scans?c=" + str(next_cursor), headers=headers, verify=False)
-            results = response.json()
-            sys.stdout.write('page: ' + str(next_cursor / 100) + "x100\r")
-            sys.stdout.flush()
-            next_cursor = results['pagination']['next_cursor']
-            for result in results['scans']:
-                res.append(result)
-        except requests.exceptions.ConnectionError:
-            print "retry:", next_cursor
+    response = requests.get(server_url + "/api/v1/scans?c=%s&l=%s"%(count, limit), headers=headers, verify=False)
+    results = response.json()
+    while count < results['pagination']['count']:
+        response = requests.get(server_url + "/api/v1/scans?c=%s&l=%s"%(count, limit), headers=headers, verify=False)
+        results = response.json()
+        for result in results['scans']:
+            res.append(result)
+        count += limit
     print
     return res
 
 def get_target():
-    next_cursor = 0
+    count = 0
+    limit = 100
     res = []
-    while next_cursor != None:
-        try:
-            response = requests.get(server_url + "/api/v1/targets?c=" + str(next_cursor), headers=headers, verify=False)
-            results = response.json()
-            sys.stdout.write('page: ' + str(next_cursor / 100) + "x100\r")
-            sys.stdout.flush()
-            next_cursor = results['pagination']['next_cursor']
-            for result in results['targets']:
-                res.append(result)
-        except requests.exceptions.ConnectionError:
-            print "retry:", next_cursor
+    response = requests.get(server_url + "/api/v1/targets?c=%s&l=%s"%(count, limit), headers=headers, verify=False)
+    results = response.json()
+    while count < results['pagination']['count']:
+        response = requests.get(server_url + "/api/v1/targets?c=%s&l=%s"%(count, limit), headers=headers, verify=False)
+        results = response.json()
+        for result in results['targets']:
+            res.append(result)
+        count += limit
     print
     return res
 
@@ -66,7 +82,7 @@ def add_target(url):
         target_id = res.json()['target_id']
         return target_id
     except:
-        print url, res.json()
+        print(url, res.json())
 
 def start_target(target_id):
     data = {"target_id":target_id,"profile_id": profile_id, "schedule": {"disable": False,"start_date":None,"time_sensitive": False}}
@@ -144,7 +160,7 @@ parser.add_option("--downclean", dest="downclean", help="下载所有已完成�
 (options,args)=parser.parse_args()
 parser.print_help() if len(sys.argv)<2 else 0
 
-dbname = 'lib/db/' + urlparse.urlparse(server_url).netloc + '.db'
+dbname = 'lib/db/' + urlparse(server_url).netloc + '.db'
 sql = '' if os.path.exists(dbname) else 'create table domain (domain TEXT primary key)'
 conn = sqlite3.connect(dbname)
 cursor = conn.cursor()
@@ -157,17 +173,17 @@ if options.addscan:
             if url:
                 if not url.startswith('http'):
                     url = 'http://' + url
-                url_change = urlparse.urlparse(url)
+                url_change = urlparse(url)
                 qurl = url_change.netloc
                 cursor.execute('select * from domain where domain=?', (qurl,))
                 fetch = cursor.fetchone()
                 if fetch:
-                    print 'exist %3d: %s' % (c, qurl)
+                    print('exist %3d: %s' % (c, qurl))
                 else:
                     target_id = add_target(url)
                     cursor.execute('insert into domain values (?)', (qurl,))
                     conn.commit()
-                    print 'add %3d: %s' % (c, qurl)
+                    print('add %3d: %s' % (c, qurl))
 if options.start:
     scans = []
     for c, i in enumerate(get_scan()):
@@ -175,23 +191,23 @@ if options.start:
     for c, i in enumerate(get_target()):
         if i['address'] not in scans:
             start_target(i['target_id'])
-            print 'start %3d: %s' % (c, i['address'])
+            print('start %3d: %s' % (c, i['address']))
 if options.delete:
     for c, i in enumerate(get_target()):
         delete(i['target_id'])
-        qurl = urlparse.urlparse(i['address']).netloc
+        qurl = urlparse(i['address']).netloc
         cursor.execute('delete from domain where domain=?', (qurl,))
         conn.commit()
-        print 'dele %3d: %s' % (c, i['address'])
+        print('dele %3d: %s' % (c, i['address']))
 if options.delscan:
     for c, i in enumerate(get_scan()):
         delscan(i['scan_id'])
-        print 'delscan %3d: %s' % (c, i['target']['address'])
+        print('delscan %3d: %s' % (c, i['target']['address']))
 if options.down:
     for c, i in enumerate(get_scan()):
         if i['current_session']['status'] == 'completed':
             export(i['current_session']['scan_session_id'])
-            print 'down %3d: %s' % (c, i['target']['address'])
+            print('down %3d: %s' % (c, i['target']['address']))
 if options.clean:
     sub = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     move_file('lib/download', 'old', sub)
@@ -203,21 +219,21 @@ if options.restart:
         if i['current_session']['status'] == 'failed':
             start_target(i['target_id'])
             delscan(i['scan_id'])
-            print 'restart %3d-%6s: %s' % (c, i['current_session']['status'], i['target']['address'])
+            print('restart %3d-%6s: %s' % (c, i['current_session']['status'], i['target']['address']))
 if options.downclean:
     for c, i in enumerate(get_scan()):
         if i['current_session']['status'] == 'completed':
             export(i['current_session']['scan_session_id'])
             delete(i['target_id'])
-            print 'download %3d %6s: %s' % (c, i['current_session']['status'], i['target']['address'])
+            print('download %3d %6s: %s' % (c, i['current_session']['status'], i['target']['address']))
 if options.checktime:
     for c, i in enumerate(get_scan()):
         if i['current_session']['status'] == 'processing':
             _ = datetime.now() - iso8601.parse_date(i['current_session']['start_date']).replace(tzinfo=None)
             if _.seconds > 3600 * options.checktime:
                 pausescan(i['scan_id'])
-                print 'pausescan %3d: %s' % (c, i['target']['address'])
+                print('pausescan %3d: %s' % (c, i['target']['address']))
 if options.conf:
     for c, i in enumerate(get_target()):
         config(i['target_id'])
-        print 'config %3d: %s' % (c, i['address'])
+        print('config %3d: %s' % (c, i['address']))
